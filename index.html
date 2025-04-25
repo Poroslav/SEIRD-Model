@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>SEIRD-based disease simulation</title>
+    <style>
+        input {
+            margin: 3px;
+        }
+    </style>
+</head>
+<body>
+    <input type="number" id="beta" placeholder="Beta" />
+    <input type="number" id="sigma" placeholder="Sigma" />
+    <input type="number" id="gamma" placeholder="Gamma" />
+    <input type="number" id="mu" placeholder="Mu" />
+    <input type="number" id="ro" placeholder="Ro" />
+    <input type="number" id="delta" placeholder="Delta" />
+    <input type="number" id="S" placeholder="S" />
+    <input type="number" id="E" placeholder="E" />
+    <input type="number" id="I" placeholder="I" />
+    <input type="number" id="R" placeholder="R" />
+    <input type="number" id="D" placeholder="D" />
+    <input type="number" id="iterations" placeholder="Iterations" />
+    <input type="number" id="timeStep" placeholder="Time step" />
+    <button type="button" id="runButton">Run simulation</button>
+    <script>
+        class SEIRDModel {
+            constructor(params, initialState) {
+                // Model parameters
+                this.beta = params.beta; 
+                this.sigma = params.sigma;
+                this.gamma = params.gamma;
+                this.mu = params.mu;
+                this.ro = params.ro;
+                this.delta = params.delta;
+                this.dt = params.dt;
+
+                // Initial state
+                this.S = initialState.S;
+                this.E = initialState.E;
+                this.I = initialState.I;
+                this.R = initialState.R;
+                this.D = initialState.D;
+                this.N = this.S + this.E + this.I + this.R + this.D;
+
+                this.results = [];
+                this.currentDay = 0;
+                this.isRunning = false;
+                this.animationId = null;
+            }
+
+            step() {
+                const dS = -this.beta * this.S * this.I / this.N;
+                const dE = (this.beta * this.S * this.I + this.ro * this.S * this.D) / this.N - this.sigma * this.E;
+                const dI = this.sigma * this.E - this.gamma * this.I - this.mu * this.I;
+                const dR = this.gamma * this.I;
+                const dD = this.mu * this.I - this.delta * this.D;
+
+                this.S += dS * this.dt;
+                this.E += dE * this.dt;
+                this.I += dI * this.dt;
+                this.R += dR * this.dt;
+                this.D += dD * this.dt;
+                
+                this.S = Math.max(0, this.S);
+                this.E = Math.max(0, this.E);
+                this.I = Math.max(0, this.I);
+                this.R = Math.max(0, this.R);
+                this.D = Math.max(0, this.D);
+                this.N = this.S + this.E + this.I + this.R + this.D;
+
+                this.results.push({
+                    S: this.S,
+                    E: this.E,
+                    I: this.I,
+                    R: this.R,
+                    D: this.D,
+                });
+                
+                this.currentDay += this.dt;
+                return this.currentDay;
+            }
+
+            run(days, onUpdate, onComplete) {
+                if (this.isRunning) {
+                    cancelAnimationFrame(this.animationId);
+                }
+                
+                this.results = [];
+                this.currentDay = 0;
+                this.isRunning = true;
+                
+                const runStep = () => {
+                    if (this.currentDay >= days) {
+                        this.isRunning = false;
+                        onComplete(this.results);
+                        return;
+                    }
+                    
+                    this.step();
+                    if (this.currentDay % 1 < this.dt) { // Update ~once per virtual day
+                        onUpdate(this.results);
+                    }
+                    
+                    this.animationId = requestAnimationFrame(runStep);
+                };
+                
+                this.animationId = requestAnimationFrame(runStep);
+            }
+            
+            stop() {
+                cancelAnimationFrame(this.animationId);
+                this.isRunning = false;
+            }
+        }
+    </script>
+    <script>
+        let beta = document.getElementById("beta");
+        let gamma = document.getElementById("gamma");
+        let sigma = document.getElementById("sigma");
+        let mu = document.getElementById("mu");
+        let ro = document.getElementById("ro");
+        let delta = document.getElementById("delta");
+        let S = document.getElementById("S");
+        let E = document.getElementById("E");
+        let I = document.getElementById("I");
+        let R = document.getElementById("R");
+        let D = document.getElementById("D");
+        let timeStep = document.getElementById("timeStep");
+        let iterations = document.getElementById("iterations");
+        let runButton = document.getElementById("runButton");
+        
+        let model = null;
+        
+        runButton.addEventListener('click', function() {
+            const params = {
+                beta: parseFloat(beta.value), 
+                gamma: parseFloat(gamma.value), 
+                sigma: parseFloat(sigma.value), 
+                mu: parseFloat(mu.value), 
+                ro: parseFloat(ro.value), 
+                delta: parseFloat(delta.value), 
+                dt: parseFloat(timeStep.value)
+            };
+            
+            const initialState = {
+                S: parseFloat(S.value), 
+                E: parseFloat(E.value), 
+                I: parseFloat(I.value), 
+                R: parseFloat(R.value), 
+                D: parseFloat(D.value)
+            };
+            
+            if (model) model.stop();
+            
+            model = new SEIRDModel(params, initialState);
+            
+            model.run(
+                parseFloat(iterations.value),
+                (results) => {
+                    console.log(`Current day: ${model.currentDay.toFixed(1)}`, 
+                               `S: ${results[results.length-1].S.toFixed(1)}`);
+                },
+                (finalResults) => {
+                    console.log("Simulation complete", finalResults);
+                }
+            );
+        });
+    </script>
+</body>
+</html>
