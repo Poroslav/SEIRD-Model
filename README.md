@@ -1,2 +1,2 @@
 # SEIRD-Model
-This is for a school project. After it's all over, I might add full documentation of that study.
+This repo has been archived. If you, for any reason, will need this repo's contents, contact poroslavdev@gmail.com.
